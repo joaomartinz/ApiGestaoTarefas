@@ -68,3 +68,59 @@ class InviteToken(Base):
     token = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
     expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(days=1))
     accepted = Column(Boolean, default=False)
+
+Base.metadata.create_all(bind=engine)
+
+# === Sessão do banco ===
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally: 
+        db.close()
+
+# === Hash de senha === 
+pwd_context = CryptContext(schemes=["bcrypt"], Deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+# === JWT === 
+oauth_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode,JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def get_current_user(token: str = Depends(oauth_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=JWT_ALGORITHM)
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Invalid token",
+            )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    return user
