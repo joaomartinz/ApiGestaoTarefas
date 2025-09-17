@@ -124,3 +124,71 @@ def get_current_user(token: str = Depends(oauth_scheme), db: Session = Depends(g
             detail="User not found",
         )
     return user
+
+# Auth Schemas ===
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserOut(BaseModel):
+    id: int
+    email: EmailStr
+
+    class config:
+        orm_mode = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+# === Board / Column / Card Schemas === 
+class CardCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    position: Optional[int] = 0
+
+class CardOut(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    position: int
+
+class ColumnCreate(BaseModel):
+    title: str
+    position: Optional[int] = 0
+
+class ColumnOut(BaseModel):
+    id: int
+    title: str
+    position: int
+    card: List[CardOut] = []
+
+    class config: 
+        orm_mode = True
+
+class BoardCreate(BaseModel):
+    title: str
+
+class BoardOut(BaseModel):
+    id: int
+    title: str
+    owner: UserOut
+    columns: List[ColumnOut] = []
+
+    class config: 
+        orm_mode = True
+
+# === Invite Schemas ===
+class InviteCreate(BaseModel):
+    email: EmailStr
+
+class InviteOut(BaseModel):
+    id: int
+    email: EmailStr
+    token: str
+    expires_at: str
+    accepted: bool
+
+    class config:
+        orm_mode = True
+
